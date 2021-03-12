@@ -1,0 +1,16 @@
+version: "3.3"
+
+volumes:
+  qb-redis: 
+    external: true
+
+services: 
+  api:
+    build: .
+    ports: 
+      - "8080:8080"
+  redis:
+    image: redis
+    volumes: 
+      - qb-redis:/data
+
