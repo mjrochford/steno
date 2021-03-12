@@ -52,7 +52,7 @@ func (store RedisStore) Search(user_id string, pattern string) ([]string, error)
 		return nil, err
 	}
 
-	out_list := make([]string, len(list))
+	out_list := make([]string, 0, len(list))
 	for _, quote := range list {
 		if re.Match([]byte(quote)) {
 			out_list = append(out_list, quote)

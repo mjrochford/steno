@@ -23,8 +23,6 @@ type QuoteStore interface {
 	Rm(user_id string, quote string) error
 }
 
-var steno_store QuoteStore
-
 func writeJson(w http.ResponseWriter, v interface{}) {
 	marshaled_json, err := json.Marshal(v)
 	if err != nil {
@@ -84,18 +82,23 @@ func getQuotesForUser(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		limit = math.MaxInt64
 	}
 
+	search_string := r.FormValue("search")
+
 	var quotes []string
 	var err error
-	if random {
+	if len(search_string) > 0 {
+		quotes, err = steno_store.Search(id, search_string)
+	} else if random {
 		var quote string
 		quote, err = steno_store.GetRandom(id)
 
 		quotes = []string{quote}
 	} else {
 		quotes, err = steno_store.GetAll(id)
-		limit = int(math.Min(float64(len(quotes)), float64(limit)))
-		quotes = quotes[0:limit]
 	}
+
+	limit = int(math.Min(float64(len(quotes)), float64(limit)))
+	quotes = quotes[0:limit]
 
 	if err != nil {
 		writeError(w, err, http.StatusInternalServerError)
@@ -110,6 +113,8 @@ func getQuotesForUser(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 
 	writeJson(w, quotes)
 }
+
+var steno_store QuoteStore
 
 func main() {
 	steno_store = redis_store.Connect("redis:6379", "", 0)
