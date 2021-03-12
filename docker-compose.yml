@@ -7,6 +7,8 @@ volumes:
 services: 
   api:
     build: .
+    environment:
+      - STENO_REDIS_ADDR=redis:6379
     ports: 
       - "8080:8080"
   redis:

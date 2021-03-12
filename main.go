@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -35,7 +36,7 @@ func writeJson(w http.ResponseWriter, v interface{}) {
 
 func writeError(w http.ResponseWriter, err error, statusCode int) {
 	w.WriteHeader(statusCode)
-	fmt.Fprintf(w, `{"error": "%s", "success": false}`, err)
+	fmt.Fprintf(w, `{"error": "%s", "success": false}`, strings.ReplaceAll(err.Error(), `"`, `\"`))
 }
 
 func addQuotes(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -117,7 +118,7 @@ func getQuotesForUser(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 var steno_store QuoteStore
 
 func main() {
-	steno_store = redis_store.Connect("redis:6379", "", 0)
+	steno_store = redis_store.Connect(os.Getenv("STENO_REDIS_ADDR"), "", 0)
 	router := httprouter.New()
 	router.GET("/quotes/:id", getQuotesForUser)
 	router.POST("/quotes/:id", addQuotes)
