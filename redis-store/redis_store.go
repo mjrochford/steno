@@ -66,7 +66,7 @@ func (store RedisStore) GetAll(user_id string) ([]string, error) {
 	key := fmt.Sprintf("%s:quotes", user_id)
 
 	quotes, err := store.db.LRange(store.ctx, key, 0, -1).Result()
-	if err == redis.Nil {
+	if err == redis.Nil || len(quotes) == 0 {
 		return nil, errors.New(fmt.Sprintf("No quotes for user_id: %s", user_id))
 	} else if err != nil {
 		return nil, err

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/julienschmidt/httprouter"
+
 	"steno/redis-store"
 )
 
@@ -115,14 +116,23 @@ func getQuotesForUser(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	writeJson(w, quotes)
 }
 
+func logMiddleware(handler httprouter.Handle) httprouter.Handle {
+	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+		handler(w, r, ps)
+		log.Printf("%s %s --- %s %s", r.UserAgent(), r.RemoteAddr, r.Method, r.URL)
+	}
+}
+
 var steno_store QuoteStore
 
 func main() {
+	log.SetOutput(os.Stdout)
 	steno_store = redis_store.Connect(os.Getenv("STENO_REDIS_ADDR"), "", 0)
+
 	router := httprouter.New()
-	router.GET("/quotes/:id", getQuotesForUser)
-	router.POST("/quotes/:id", addQuotes)
-	router.DELETE("/quotes/:id", removeQuotes)
+	router.GET("/quotes/:id", logMiddleware(getQuotesForUser))
+	router.POST("/quotes/:id", logMiddleware(addQuotes))
+	router.DELETE("/quotes/:id", logMiddleware(removeQuotes))
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
