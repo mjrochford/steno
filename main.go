@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"io/ioutil"
 	"math"
+	"time"
 	"net/http"
 	"os"
 	"strconv"
@@ -23,6 +25,41 @@ type QuoteStore interface {
 	Search(user_id string, pattern string) ([]string, error)
 	Push(user_id string, quote string) error
 	Rm(user_id string, quote string) error
+}
+
+type RouteHandle func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) bool
+type Route struct {
+	handlers []RouteHandle
+}
+
+func New() Route {
+	return Route{
+		handlers: make([]RouteHandle, 0, 4),
+	}
+}
+
+func (rt Route) Handle() httprouter.Handle {
+	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+		for _, h := range rt.handlers {
+			if !h(w, r, ps) {
+				break
+			}
+		}
+	}
+}
+
+func (rt Route) Apply(handler httprouter.Handle) Route {
+	rt.handlers = append(rt.handlers,
+		func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) bool {
+			handler(w, r, ps)
+			return true
+		})
+	return rt
+}
+
+func (rt Route) Gate(handler RouteHandle) Route {
+	rt.handlers = append(rt.handlers, handler)
+	return rt
 }
 
 func writeJson(w http.ResponseWriter, v interface{}) {
@@ -44,7 +81,7 @@ func addQuotes(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	id := ps.ByName("id")
 	quote := r.FormValue("quote")
 	if quote == "" {
-		writeError(w, errors.New("Invalid request"), http.StatusBadRequest)
+		writeError(w, errors.New("steno: invalid request, No quote provided"), http.StatusBadRequest)
 		return
 	}
 
@@ -61,8 +98,12 @@ func addQuotes(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 func removeQuotes(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	id := ps.ByName("id")
 	quote := r.FormValue("quote")
+	/* on http DELETE this will ignore values in the body
+	 * so this must be provided in the query params I don't like this
+	 */
+
 	if quote == "" {
-		writeError(w, errors.New("Invalid request"), http.StatusBadRequest)
+		writeError(w, errors.New("steno: invalid request, No quote provided"), http.StatusBadRequest)
 		return
 	}
 
@@ -116,23 +157,66 @@ func getQuotesForUser(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	writeJson(w, quotes)
 }
 
-func logMiddleware(handler httprouter.Handle) httprouter.Handle {
-	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-		handler(w, r, ps)
-		log.Printf("%s %s --- %s %s", r.UserAgent(), r.RemoteAddr, r.Method, r.URL)
+func httplog(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.Printf("%s %s --- %s %s", r.UserAgent(), r.RemoteAddr, r.Method, r.URL)
+}
+
+func authenticate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) bool {
+	auth := r.Header["Authorization"][0]
+	token_type := strings.Split(auth, " ")[0] // Bearer ...
+	// token := strings.Split(auth, " ")[1]      // ... {token}
+
+	if token_type != "Bot" {
+		writeError(w, errors.New("steno: invalid request, Bad token"), http.StatusBadRequest)
+		return false
 	}
+
+	discord_req, err := http.NewRequest("GET", "https://discord.com/api/v8/oauth2/applications/@me", nil)
+	if err != nil {
+		writeError(w, err, http.StatusInternalServerError)
+		return false
+	}
+	discord_req.Header.Add("Authorization", auth)
+
+	// log.Println(discord_req.Header["Authorization"])
+
+	resp, err := http_client.Do(discord_req)
+
+	if err != nil {
+		writeError(w, err, http.StatusInternalServerError)
+		return false
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := ioutil.ReadAll(resp.Body)
+		writeError(w, errors.New(string(body)), resp.StatusCode)
+		log.Printf("Access Denied from %s: %s", r.RemoteAddr, errors.New(string(body)))
+		return false
+	}
+
+	log.Printf("discord reponse status %s", resp.Status)
+	return true
 }
 
 var steno_store QuoteStore
+var http_client *http.Client
 
 func main() {
 	log.SetOutput(os.Stdout)
 	steno_store = redis_store.Connect(os.Getenv("STENO_REDIS_ADDR"), "", 0)
 
+	tr := &http.Transport{
+		MaxIdleConns:       10,
+		IdleConnTimeout:    30 * time.Second,
+		DisableCompression: true,
+		TLSClientConfig: nil,
+	}
+	http_client = &http.Client{Transport: tr}
+
 	router := httprouter.New()
-	router.GET("/quotes/:id", logMiddleware(getQuotesForUser))
-	router.POST("/quotes/:id", logMiddleware(addQuotes))
-	router.DELETE("/quotes/:id", logMiddleware(removeQuotes))
+	router.GET("/quotes/:id", New().Apply(httplog).Gate(authenticate).Apply(getQuotesForUser).Handle())
+	router.POST("/quotes/:id", New().Apply(httplog).Apply(addQuotes).Handle())
+	router.DELETE("/quotes/:id", New().Apply(httplog).Apply(removeQuotes).Handle())
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
