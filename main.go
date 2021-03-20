@@ -162,7 +162,12 @@ func httplog(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 }
 
 func authenticate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) bool {
-	auth := r.Header["Authorization"][0]
+	authorization := r.Header["Authorization"]
+	if len(authorization) == 0 {
+		writeError(w, errors.New("steno: invalid request, No Authorization"), http.StatusBadRequest)
+		return false
+	}
+	auth := authorization[0]
 	token_type := strings.Split(auth, " ")[0] // Bearer ...
 	// token := strings.Split(auth, " ")[1]      // ... {token}
 
@@ -208,8 +213,6 @@ func main() {
 	tr := &http.Transport{
 		MaxIdleConns:       10,
 		IdleConnTimeout:    30 * time.Second,
-		DisableCompression: true,
-		TLSClientConfig: nil,
 	}
 	http_client = &http.Client{Transport: tr}
 
