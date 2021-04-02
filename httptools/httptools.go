@@ -13,17 +13,18 @@ type Route struct {
 }
 
 func RouteNew() Route {
-	return Route{
+	r := Route{
 		handlers: make([]RouteHandle, 0, 4),
 	}
+	return r
 }
 
 func (rt Route) Clone() Route {
-	new_rt := RouteNew()
-	new_rt.handlers = make([]RouteHandle, len(rt.handlers))
-	copy(new_rt.handlers, rt.handlers)
+	newRoute := RouteNew()
+	newRoute.handlers = make([]RouteHandle, len(rt.handlers))
+	copy(newRoute.handlers, rt.handlers)
 
-	return new_rt
+	return newRoute
 }
 
 func (rt Route) Handle() httprouter.Handle {
@@ -58,7 +59,6 @@ func (rt Route) Log() Route {
 	return rt.Apply(httplog)
 }
 
-func httplog(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func httplog(_ http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	log.Printf("%s %s --- %s %s", r.UserAgent(), r.RemoteAddr, r.Method, r.URL)
 }
-
