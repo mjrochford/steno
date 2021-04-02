@@ -10,5 +10,4 @@ lint:
 	golint ./...
 
 format:
-	gofmt -w -s **/*.go *.go
-
+	find . -iname "*.go" | xargs gofmt -w -s
