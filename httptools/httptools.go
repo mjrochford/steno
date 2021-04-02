@@ -10,11 +10,6 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-type HTTPError struct {
-	err error
-	status int
-}
-
 type RouteHandle func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error)
 type Route struct {
 	handlers []RouteHandle
@@ -41,7 +36,7 @@ func (rt Route) Handle() httprouter.Handle {
 			status, err := h(w, r, ps)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("steno: %s", err.Error()), status)
-				log.Printf("ERROR/handler/%s :%s\n",
+				log.Printf("ERROR/handler/%s %s\n",
 					runtime.FuncForPC(reflect.ValueOf(h).Pointer()).Name(),
 					err.Error())
 				break

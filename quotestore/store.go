@@ -1,8 +1,10 @@
 package quotestore
 
 import (
-	"time"
 	"encoding/json"
+	"errors"
+	"io"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -10,12 +12,12 @@ import (
 )
 
 type Quote struct {
-	ID string `json:"id"`
-	StenographerID string `json:"stenographer_id"`
+	ID       string `json:"id"`
 	AuthorID string `json:"author_id"`
+	Str      string `json:"str"`
 
-	Str string `json:"str"`
-	Date string `json:"date"`
+	Date           string `json:"date"`            // optional
+	StenographerID string `json:"stenographer_id"` // optional
 }
 
 func (q Quote) MarshalBinary() ([]byte, error) {
@@ -44,19 +46,28 @@ func ISO8601Date(t time.Time) string {
 }
 
 func QuoteNew(author, stenographer discord.User, q string) Quote {
-	return Quote {
-		ID: uuid.NewString(),
-		Date: ISO8601Date(time.Now()),
+	return Quote{
+		ID:             uuid.NewString(),
+		Date:           ISO8601Date(time.Now()),
 		StenographerID: stenographer.ID,
-		AuthorID: author.ID,
+		AuthorID:       author.ID,
 	}
 }
 
-func QuoteFromJSON(j string) (Quote, error) {
+func QuoteFromJSON(j []byte) (Quote, error) {
 	var q Quote
-	err := json.Unmarshal([]byte(j), &q)
+	err := json.Unmarshal(j, &q)
 	if err != nil {
 		return Quote{}, err
+	}
+
+	if q.Str == "" {
+		return Quote{}, errors.New("no quote string provided")
+	}
+
+	// TODO assert that AuthorID and StenographerID are actually discord users
+	if q.Date == "" {
+		q.Date = ISO8601Date(time.Now())
 	}
 
 	if q.ID == "" {
@@ -64,6 +75,14 @@ func QuoteFromJSON(j string) (Quote, error) {
 	}
 
 	return q, nil
+}
+
+func QuoteFromReader(r io.Reader) (Quote, error) {
+	buf, err := io.ReadAll(r)
+	if err != nil {
+		return Quote{}, err
+	}
+	return QuoteFromJSON(buf)
 }
 
 type QuoteStore interface {
@@ -74,4 +93,3 @@ type QuoteStore interface {
 	Push(guildID, userID string, quote Quote) error
 	Rm(guildID, userID string, quote Quote) error
 }
-

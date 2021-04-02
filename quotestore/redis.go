@@ -1,14 +1,20 @@
 // Package quotestore redis backend for discord quote storage
 package quotestore
 
+// redis is a bad choice for how i have the data setup,
+// i just used this because i wanted to see what redis is like
+
+// redis could be used as a caching front layer to a more
+// proper relational database to lessen the join queries on the db
+
 import (
 	"context"
-	"os"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"math/rand"
+	"os"
 	"regexp"
 
 	"github.com/go-redis/redis/v8"
@@ -59,6 +65,7 @@ func (store RedisStore) Rm(guildID, userID string, quote Quote) error {
 }
 
 func (store RedisStore) Search(guildID, userID, pattern string) ([]Quote, error) {
+	// very unoptimal searching but redis is unoptimal for this application
 	list, err := store.GetAll(guildID, userID)
 	if err != nil {
 		return nil, err
@@ -82,7 +89,7 @@ func (store RedisStore) Search(guildID, userID, pattern string) ([]Quote, error)
 func quotesFromDB(quotes []string) []Quote {
 	out := make([]Quote, 0, len(quotes))
 	for _, q := range quotes {
-		quote, err := QuoteFromJSON(q)
+		quote, err := QuoteFromJSON([]byte(q))
 		if err == nil {
 			out = append(out, quote)
 		} else {
@@ -101,7 +108,6 @@ func (store RedisStore) GetAll(guildID, userID string) ([]Quote, error) {
 	} else if err != nil {
 		return nil, err
 	}
-
 
 	return quotesFromDB(quotes), nil
 }
@@ -168,4 +174,3 @@ func (store RedisStore) LoadSavedData(saveLocation string) {
 
 	store.Import(savedData)
 }
-
