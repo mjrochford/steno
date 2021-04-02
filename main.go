@@ -72,11 +72,6 @@ func addQuotes(_ http.ResponseWriter, r *http.Request, ps httprouter.Params) (in
  *
  * @url_param guild_id string
  * @url_param user_id string
- *
- * @query_params search string a string to search the users quotes for
- * @query_params limit uint limit the amount of results that can be returned default 100
- * @query_params random bool only return one random quote if true
- *
 NOTE:
  * redisstore requires the consumer of the api to provide json that will encode and then decode
  * and match with the json stored in the database, does not just match quote.ID which it probably
