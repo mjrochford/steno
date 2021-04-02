@@ -1,8 +1,14 @@
-
-docker-build:
+build:
 	go build
 	@go clean
 
-docker-up: 
+up: 
 	@docker-compose stop
 	docker-compose up --force-recreate --build
+
+lint:
+	golint ./...
+
+format:
+	gofmt -w -s **/*.go *.go
+
