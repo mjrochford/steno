@@ -1,13 +1,21 @@
 package httptools
 
 import (
-	"net/http"
+	"fmt"
 	"log"
+	"net/http"
+	"reflect"
+	"runtime"
 
 	"github.com/julienschmidt/httprouter"
 )
 
-type RouteHandle func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) bool
+type HTTPError struct {
+	err error
+	status int
+}
+
+type RouteHandle func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error)
 type Route struct {
 	handlers []RouteHandle
 }
@@ -30,22 +38,27 @@ func (rt Route) Clone() Route {
 func (rt Route) Handle() httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		for _, h := range rt.handlers {
-			if !h(w, r, ps) {
+			status, err := h(w, r, ps)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("steno: %s", err.Error()), status)
+				log.Printf("ERROR/handler/%s :%s\n",
+					runtime.FuncForPC(reflect.ValueOf(h).Pointer()).Name(),
+					err.Error())
 				break
 			}
 		}
 	}
 }
 
-func (rt Route) Finish(handler httprouter.Handle) httprouter.Handle {
-	return rt.Apply(handler).Handle()
+func (rt Route) Finish(handler RouteHandle) httprouter.Handle {
+	return rt.Gate(handler).Handle()
 }
 
 func (rt Route) Apply(handler httprouter.Handle) Route {
 	rt.handlers = append(rt.handlers,
-		func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) bool {
+		func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
 			handler(w, r, ps)
-			return true
+			return http.StatusOK, nil
 		})
 	return rt
 }

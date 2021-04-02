@@ -86,7 +86,7 @@ func quotesFromDB(quotes []string) []Quote {
 		if err == nil {
 			out = append(out, quote)
 		} else {
-			log.Printf("redisStore: error unmarshaling json from db -- %s\n", err)
+			log.Printf("redisstore: error unmarshaling json from db -- %s\n", err)
 		}
 	}
 	return out
@@ -97,7 +97,7 @@ func (store RedisStore) GetAll(guildID, userID string) ([]Quote, error) {
 
 	quotes, err := store.db.LRange(store.ctx, uri, 0, -1).Result()
 	if err == redis.Nil || len(quotes) == 0 {
-		return nil, fmt.Errorf("redisStore: No quotes for guildID: %suserID: %s", guildID, userID)
+		return nil, fmt.Errorf("redisstore: No quotes for guildID:%s userID:%s", guildID, userID)
 	} else if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (store RedisStore) Import(data map[string][]Quote) {
 		for _, quote := range quotes {
 			_, err := store.db.RPush(store.ctx, user, quote).Result()
 			if err != nil {
-				log.Printf("redis_store: error importing key [%s := %s] %s",
+				log.Printf("redisstore: error importing key [%s := %s] %s",
 					user, quote, err)
 			}
 		}

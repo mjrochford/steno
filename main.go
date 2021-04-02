@@ -28,47 +28,44 @@ func httpError(w http.ResponseWriter, err error, status int) {
 	log.Printf("ERROR/steno/%s\n", err.Error())
 }
 
-func addQuotes(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+var stenoStore quotestore.RedisStore
+var httpClient *http.Client
+
+func addQuotes(_ http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
 	userID := ps.ByName("user_id")
 	guildID := ps.ByName("guild_id")
 	quote, err := quotestore.QuoteFromJSON(r.FormValue("quote"))
 	if err != nil {
-		httpStringError(w, "invalid request, No quote provided", http.StatusBadRequest)
-		return
+		return http.StatusBadRequest, errors.New("invalid request, No quote provided")
 	}
 
 	err = stenoStore.Push(guildID, userID, quote)
 	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return
+		return http.StatusInternalServerError, fmt.Errorf("add quote failed/%s", err)
 	}
 
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintln(w, `"{success: true}"`)
+	return http.StatusOK, nil
 }
 
-func removeQuotes(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func removeQuotes(_ http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
 	userID := ps.ByName("user_id")
 	guildID := ps.ByName("guild_id")
 	quote, err := quotestore.QuoteFromJSON(r.FormValue("quote"))
 	if err != nil {
-		httpStringError(w, "invalid request, No quote provided", http.StatusBadRequest)
-		return
+		return http.StatusBadRequest, errors.New("invalid request, No quote provided")
 	}
 
 	err = stenoStore.Rm(guildID, userID, quote)
 	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return
+		return http.StatusInternalServerError, fmt.Errorf("rm quote failed/%s", err)
 	}
 
-	w.WriteHeader(http.StatusOK)
+	return http.StatusOK, nil
 }
 
-func getQuotesForUser(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func getQuotesForUser(w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
 	userID := ps.ByName("user_id")
 	guildID := ps.ByName("guild_id")
-	log.Printf("Getting user quotes for guild:%s user:%s \n", guildID, userID)
 
 	random := strings.Compare(strings.ToLower(r.FormValue("random")), "true") == 0
 	limit, err := strconv.Atoi(r.FormValue("limit"))
@@ -93,21 +90,20 @@ func getQuotesForUser(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	quotes = quotes[0:limit]
 
 	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return
+		return http.StatusInternalServerError, fmt.Errorf("get quotes failed/%s", err)
 	}
 
 	if len(quotes) <= 0 {
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintln(w, `"{success: false}"`)
-		return
+		return http.StatusNotFound, fmt.Errorf("no quotes for user/%s", err)
 	}
 
 	quotesJSON, err := json.Marshal(quotes)
 	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
+		return http.StatusInternalServerError, fmt.Errorf("json marshal failed/%s", err)
 	}
+
 	fmt.Fprint(w, string(quotesJSON))
+	return http.StatusOK, nil
 }
 
 func discordRequest(method, url, auth string) ([]byte, error) {
@@ -120,26 +116,24 @@ func discordRequest(method, url, auth string) ([]byte, error) {
 	}
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("%d", resp.StatusCode)
+		return nil, fmt.Errorf("discord requst not ok: %d", resp.StatusCode)
 	}
 
 	out, _ := ioutil.ReadAll(resp.Body)
 	return out, nil
 }
 
-func authenticate(w http.ResponseWriter, r *http.Request, _ httprouter.Params) bool {
+func authenticate(_ http.ResponseWriter, r *http.Request, _ httprouter.Params) (int, error) {
 	authorization := r.Header["Authorization"]
 	if len(authorization) == 0 {
-		httpStringError(w, "invalid request, No Authorization", http.StatusBadRequest)
-		return false
+		return http.StatusBadRequest, errors.New("invalid request, No Authorization")
 	}
 	auth := authorization[0]
 	tokenType := strings.Split(auth, " ")[0] // Bearer ...
 	// token := strings.Split(auth, " ")[1]   // ... {token}
 
 	if tokenType != "Bot" {
-		httpStringError(w, "invalid request, Bad token", http.StatusBadRequest)
-		return false
+		return http.StatusBadRequest, errors.New("invalid request, Bad token")
 	}
 
 	// Error conditions for http.NewRequest are
@@ -151,21 +145,17 @@ func authenticate(w http.ResponseWriter, r *http.Request, _ httprouter.Params) b
 	respBody, err := discordRequest(http.MethodGet,
 		"https://discord.com/api/v8/oauth2/applications/@me", auth)
 	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return false
+		return http.StatusInternalServerError, fmt.Errorf("discord request failed: %s", err)
 	}
 	var discordApp discord.Application
 	err = json.Unmarshal(respBody, &discordApp)
 	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return false
+		return http.StatusInternalServerError, fmt.Errorf("disord request parsing failed: %s", err)
 	}
 
-	return true
+	return http.StatusOK, nil
 }
 
-var stenoStore quotestore.RedisStore
-var httpClient *http.Client
 func main() {
 
 	log.SetOutput(os.Stdout)
