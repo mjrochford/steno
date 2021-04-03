@@ -11,6 +11,8 @@ services:
       - STENO_REDIS_ADDR=redis:6379
     ports: 
       - "8080:8080"
+  qb:
+    build: ../distent
   redis:
     image: redis
     volumes: 
