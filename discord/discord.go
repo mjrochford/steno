@@ -61,7 +61,7 @@ type Application struct {
 	// the description of the app
 	Description string `json:"description"`
 	// an array of rpc origin urls, if rpc is enabled
-	RpcOrigins []string `json:"rpc_origins"`
+	RPCOrigins []string `json:"rpc_origins"`
 	// when false only app owner can join the app's bot to guilds
 	BotPublic bool `json:"bot_public"`
 	// when true the app's bot will only join upon completion of the full oauth2 code grant flow
@@ -162,7 +162,7 @@ type Guild struct {
 	// the maximum number of members for the guild
 	MaxMembers int `json:"max_members"`
 	// the vanity url code for the guild
-	VanityUrlCode string `json:"vanity_url_code"`
+	VanityURLCode string `json:"vanity_url_code"`
 	// the description for the guild, if the guild is discoverable
 	Description string `json:"description"`
 	// banner hash
@@ -226,21 +226,21 @@ type GuildMember struct {
 
 type Emoji struct {
 	// emoji id
-	id string
+	ID string
 	// emoji name (can be null only in reaction emoji objects)
-	name string
+	Name string
 	// roles this emoji is whitelisted to
-	roles []string
+	Roles []string
 	// user that created this emoji
-	user User
+	User User
 	// whether this emoji must be wrapped in colons
-	require_colons bool
+	RequireColons bool
 	// whether this emoji is managed
-	managed bool
+	Managed bool
 	// whether this emoji is animated
-	animated bool
+	Animated bool
 	// whether this emoji can be used, may be false due to loss of Server Boosts
-	available bool
+	Available bool
 }
 
 type Role struct {
@@ -378,7 +378,7 @@ type Activity struct {
 	// activity type
 	Type int `json:"type"`
 	// stream url, is validated when type is 1
-	Url string `json:"url"`
+	URL string `json:"url"`
 	// unix timestamp of when the activity was added to the user's session
 	CreatedAt int `json:"created_at"`
 	// unix timestamps for start and/or end of the game
