@@ -134,7 +134,7 @@ func getQuotesForUser(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	}
 
 	if len(quotes) <= 0 {
-		return http.StatusNotFound, fmt.Errorf("no quotes for user/%s", err)
+		return http.StatusNotFound, fmt.Errorf("no quotes for user/%s", userID)
 	}
 
 	quotesJSON, err := json.Marshal(quotes)
